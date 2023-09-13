@@ -9,8 +9,14 @@ int main(int argc, char** argv) {
     }
 
     VM* vm = VM_init();
-    uint16_t rom_size = VM_load_rom(vm, argv[1]);
+    int16_t rom_size = VM_load_rom(vm, argv[1]);
+
+    if (rom_size == -1) {
+        printf("No such file \"%s\"\n", argv[1]);
+        return 0;
+    }
     printf("Loaded %s (%d bytes)\n", argv[1], rom_size);
+
     VM_run(vm);
     VM_free(vm);
 

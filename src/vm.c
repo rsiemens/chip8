@@ -61,14 +61,14 @@ void subroutine_return(Inst* inst, VM* vm) {
 
 // 0x1NNN
 void jump(Inst* inst, VM* vm) {
-    uint16_t addr = inst->opcode &0x0FFF;
+    uint16_t addr = inst->opcode & 0x0FFF;
     vm->pc = addr;
 }
 
 // 0x2NNN
 void subroutine_call(Inst* inst, VM* vm) {
     uint16_t return_addr = vm->pc;
-    uint16_t jump_addr = inst->opcode &0x0FFF;
+    uint16_t jump_addr = inst->opcode & 0x0FFF;
     vm->pc = jump_addr;
     // Stack grows down from the top of memory. It stores 16bit addresses
     vm->sp += 2;
@@ -121,6 +121,7 @@ void math(Inst* inst, VM* vm) {
     uint8_t operation = inst->opcode & 0x0F;
     uint8_t v_register_y = (inst->opcode >> 4) & 0x0F;
     uint8_t v_register_x = (inst->opcode >> 8) & 0x0F;
+    uint8_t v_f_value = 0;
 
     switch (operation) {
         case 0x00:
@@ -128,34 +129,42 @@ void math(Inst* inst, VM* vm) {
             break;
         case 0x01:
             vm->v[v_register_x] |= vm->v[v_register_y];
+            vm->v[0x0F] = v_f_value;
             break;
         case 0x02:
             vm->v[v_register_x] &= vm->v[v_register_y];
+            vm->v[0x0F] = v_f_value;
             break;
         case 0x03:
             vm->v[v_register_x] ^= vm->v[v_register_y];
+            vm->v[0x0F] = v_f_value;
             break;
         case 0x04:
-            if (vm->v[v_register_x] + vm->v[v_register_y] > 0xFF) {
-                vm->v[0x0F] = 1;
-            }
+            if (vm->v[v_register_x] + vm->v[v_register_y] > 0xFF)
+                v_f_value = 1;
+
             vm->v[v_register_x] += vm->v[v_register_y];
+            vm->v[0x0F] = v_f_value;
             break;
         case 0x05:
-            vm->v[0xF] = vm->v[v_register_x] > vm->v[v_register_y] ? 1 : 0;
+            v_f_value = vm->v[v_register_x] > vm->v[v_register_y] ? 1 : 0;
             vm->v[v_register_x] -= vm->v[v_register_y];
+            vm->v[0xF] = v_f_value;
             break;
         case 0x06:
-            vm->v[0x0F] = vm->v[v_register_x] & 0b00000001;
-            vm->v[v_register_x] = vm->v[v_register_x] >> 1;
+            v_f_value = vm->v[v_register_y] & 0b00000001;
+            vm->v[v_register_x] = vm->v[v_register_y] >> 1;
+            vm->v[0x0F] = v_f_value;
             break;
         case 0x07:
-            vm->v[0x0F] = vm->v[v_register_y] > vm->v[v_register_x] ? 1 : 0;
+            v_f_value = vm->v[v_register_y] > vm->v[v_register_x] ? 1 : 0;
             vm->v[v_register_x] = vm->v[v_register_y] - vm->v[v_register_x];
+            vm->v[0x0F] = v_f_value;
             break;
         case 0x0E:
-            vm->v[0x0F] = vm->v[v_register_x] >> 7;
-            vm->v[v_register_x] = vm->v[v_register_x] << 1;
+            v_f_value = vm->v[v_register_y] >> 7;
+            vm->v[v_register_x] = vm->v[v_register_y] << 1;
+            vm->v[0x0F] = v_f_value;
             break;
         default:
             exit(1);
@@ -286,12 +295,14 @@ void f_family(Inst* inst, VM* vm) {
             break;
         case 0x55:
             for (int i=0; i <= v_register_x; i++) {
-                vm->memory[vm->i + i] = vm->v[i];
+                vm->memory[vm->i] = vm->v[i];
+                vm->i++;
             }
             break;
         case 0x65:
             for (int i=0; i <= v_register_x; i++) {
-                vm->v[i] = vm->memory[vm->i + i];
+                vm->v[i] = vm->memory[vm->i];
+                vm->i++;
             }
             break;
         default:
@@ -311,8 +322,11 @@ void VM_free(VM* vm) {
     free(vm);
 }
 
-uint16_t VM_load_rom(VM* vm, char* fpath) {
+int16_t VM_load_rom(VM* vm, char* fpath) {
     FILE* fd = fopen(fpath, "r");
+    if (fd == NULL)
+        return -1;
+
     uint16_t* data = calloc(MAX_PROGRAM_SIZE, 1); 
     uint16_t size = fread(data, 1, MAX_PROGRAM_SIZE, fd);
 
@@ -420,7 +434,7 @@ void VM_run(VM* vm) {
         ticks = SDL_GetTicks();
         if (SDL_TICKS_PASSED(ticks, next_instruction)) {
             VM_tick(vm);
-            next_instruction = ticks + 2;  // 500 instructions per second
+            next_instruction = ticks + 1;  // 1000 instructions per second
         }
 
         if (SDL_TICKS_PASSED(ticks, next_draw)) {

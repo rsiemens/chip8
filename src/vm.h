@@ -34,7 +34,7 @@ typedef struct{
 
 VM* VM_init();
 void VM_free(VM* vm);
-uint16_t VM_load_rom(VM* vm, char* fpath);
+int16_t VM_load_rom(VM* vm, char* fpath);
 void VM_tick(VM* vm);
 void VM_run(VM* vm);
 

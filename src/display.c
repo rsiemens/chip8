@@ -53,6 +53,7 @@ Display* Display_init() {
 void Display_free(Display* display) {
     SDL_FreePalette(display->palette);
     SDL_FreeSurface(display->draw_surface);
+    SDL_FreeSurface(display->blit_surface);
     SDL_DestroyWindow(display->window);
     SDL_Quit();
     free(display);
