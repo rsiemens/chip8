@@ -245,7 +245,7 @@ void skip_key(Inst* inst, VM* vm) {
                 vm->pc += 2;
             break;
         case 0xA1:
-            if (vm->input_active && vm->v[v_register] != vm->input)
+            if (!vm->input_active || vm->v[v_register] != vm->input)
                 vm->pc += 2;
             break;
         default:
@@ -434,7 +434,7 @@ void VM_run(VM* vm) {
         ticks = SDL_GetTicks();
         if (SDL_TICKS_PASSED(ticks, next_instruction)) {
             VM_tick(vm);
-            next_instruction = ticks + 1;  // 1000 instructions per second
+            next_instruction = ticks + 2;  // 500 instructions per second
         }
 
         if (SDL_TICKS_PASSED(ticks, next_draw)) {
