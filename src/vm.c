@@ -40,9 +40,9 @@ uint16_t as_big_endian(uint16_t n) {
 }
 
 void debug_inst(int i, char* opcode, Inst inst) {
-# ifdef DEBUG
+#ifdef DEBUG
     printf("%04X: %s (%04X)\n", i, opcode, inst.opcode);
-# endif
+#endif
 }
 
 // 0x00E0
