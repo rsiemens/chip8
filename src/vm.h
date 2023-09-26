@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "display.h"
+#include "io.h"
 
 #define MEMORY_SIZE 0xFFF
 #define PROGRAM_START_ADDR 0x200
@@ -27,9 +27,7 @@ typedef struct{
     uint8_t sound;
     uint16_t pc;   // program counter
     uint8_t sp;    // stack pointer
-    uint8_t input;
-    bool input_active;
-    Display* display;
+    IO* io;
 } VM;
 
 VM* VM_init();

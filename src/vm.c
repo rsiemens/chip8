@@ -6,8 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include <SDL2/SDL.h>
-#include "display.h"
+#include "io.h"
 #include "vm.h"
 
 const uint8_t fonts[] = {
@@ -48,7 +49,7 @@ void debug_inst(int i, char* opcode, Inst inst) {
 // 0x00E0
 void clear_screen(Inst* inst, VM* vm) {
     for (int i = 0; i < BUFFER_SIZE; i++) {
-        vm->display->buffer[i] = 0;
+        vm->io->display->buffer[i] = 0;
     }
 }
 
@@ -224,12 +225,12 @@ void draw(Inst* inst, VM* vm) {
 
             offset = ((y_coord + i) * SCREEN_WIDTH) + x_coord + j;
             new_pixel = (sprite_row >> (7-j)) & 0b00000001;
-            current_pixel = vm->display->buffer[offset]; 
+            current_pixel = vm->io->display->buffer[offset];
 
             if (new_pixel && current_pixel)
                 vm->v[0x0F] = 1;
 
-            vm->display->buffer[offset] ^= new_pixel;
+            vm->io->display->buffer[offset] ^= new_pixel;
         }
     }
 }
@@ -241,11 +242,11 @@ void skip_key(Inst* inst, VM* vm) {
 
     switch(operation) {
         case 0x9E:
-            if (vm->input_active && vm->v[v_register] == vm->input)
+            if (vm->io->keyboard->input_active && vm->v[v_register] == vm->io->keyboard->input)
                 vm->pc += 2;
             break;
         case 0xA1:
-            if (!vm->input_active || vm->v[v_register] != vm->input)
+            if (!vm->io->keyboard->input_active || vm->v[v_register] != vm->io->keyboard->input)
                 vm->pc += 2;
             break;
         default:
@@ -265,10 +266,10 @@ void f_family(Inst* inst, VM* vm) {
             vm->v[v_register_x] = vm->delay;
             break;
         case 0x0A:
-            if (!vm->input_active)
+            if (!vm->io->keyboard->input_active)
                 vm->pc -= 2;
             else
-                vm->v[v_register_x] = vm->input;
+                vm->v[v_register_x] = vm->io->keyboard->input;
             break;
         case 0x15:
             vm->delay = vm->v[v_register_x];
@@ -313,12 +314,12 @@ void f_family(Inst* inst, VM* vm) {
 VM* VM_init() {
     VM* vm = calloc(1, sizeof(VM));
     memcpy(vm->memory, fonts, 5 * 16);
-    vm->display = Display_init();
+    vm->io = IO_init();
     return vm;
 }
 
 void VM_free(VM* vm) {
-    Display_free(vm->display);
+    IO_free(vm->io);
     free(vm);
 }
 
@@ -440,64 +441,15 @@ void VM_run(VM* vm) {
         if (SDL_TICKS_PASSED(ticks, next_draw)) {
             if (vm->delay > 0)
                 vm->delay -= 1;
-            if (vm->sound > 0)
-                // TODO play sound
+            if (vm->sound > 0) {
+                Audio_play(vm->io->audio);
                 vm->sound -= 1;
-
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                switch (event.type) {
-                    case SDL_QUIT:
-                        return;
-                        break;
-                    case SDL_KEYDOWN:
-                        switch(event.key.keysym.scancode) {
-                            case SDL_SCANCODE_1: vm->input = 0x01; vm->input_active = true; break;
-                            case SDL_SCANCODE_2: vm->input = 0x02; vm->input_active = true; break;
-                            case SDL_SCANCODE_3: vm->input = 0x03; vm->input_active = true; break;
-                            case SDL_SCANCODE_4: vm->input = 0x0C; vm->input_active = true; break;
-                            case SDL_SCANCODE_Q: vm->input = 0x04; vm->input_active = true; break;
-                            case SDL_SCANCODE_W: vm->input = 0x05; vm->input_active = true; break;
-                            case SDL_SCANCODE_E: vm->input = 0x06; vm->input_active = true; break;
-                            case SDL_SCANCODE_R: vm->input = 0x0D; vm->input_active = true; break;
-                            case SDL_SCANCODE_A: vm->input = 0x07; vm->input_active = true; break;
-                            case SDL_SCANCODE_S: vm->input = 0x08; vm->input_active = true; break;
-                            case SDL_SCANCODE_D: vm->input = 0x09; vm->input_active = true; break;
-                            case SDL_SCANCODE_F: vm->input = 0x0E; vm->input_active = true; break;
-                            case SDL_SCANCODE_Z: vm->input = 0x0A; vm->input_active = true; break;
-                            case SDL_SCANCODE_X: vm->input = 0x00; vm->input_active = true; break;
-                            case SDL_SCANCODE_C: vm->input = 0x0B; vm->input_active = true; break;
-                            case SDL_SCANCODE_V: vm->input = 0x0F; vm->input_active = true; break;
-                            default: break;
-                        }
-                        break;
-                    case SDL_KEYUP:
-                        switch(event.key.keysym.scancode) {
-                            case SDL_SCANCODE_1: if (vm->input == 0x01) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_2: if (vm->input == 0x02) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_3: if (vm->input == 0x03) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_4: if (vm->input == 0x0C) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_Q: if (vm->input == 0x04) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_W: if (vm->input == 0x05) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_E: if (vm->input == 0x06) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_R: if (vm->input == 0x0D) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_A: if (vm->input == 0x07) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_S: if (vm->input == 0x08) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_D: if (vm->input == 0x09) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_F: if (vm->input == 0x0E) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_Z: if (vm->input == 0x0A) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_X: if (vm->input == 0x00) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_C: if (vm->input == 0x0B) { vm->input_active = false; } break;
-                            case SDL_SCANCODE_V: if (vm->input == 0x0F) { vm->input_active = false; } break;
-                            default: break;
-                        }
-                        break;
-                    default:
-                        break;
-                }
             }
 
-            Display_render(vm->display);
+            if (!Keyboard_process_input(vm->io->keyboard))
+                return;
+
+            Display_render(vm->io->display);
             next_draw = ticks + 17;  // 60 fps;
         }
     }
